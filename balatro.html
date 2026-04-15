@@ -1,245 +1,608 @@
 <!doctype html>
 <html lang="en-us">
 <head>
-    <script>
-        alert("Before dmcaing please contact me at celestialinqmail@gmail.com ty <3");
-    </script>
-  <base href="https://cdn.jsdelivr.net/gh/aukak/fyinx@latest/g/balatro/">
-  <meta charset="utf-8">
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, minimum-scale=1, maximum-scale=1">
-  <title>Balatro</title>
+  <script>
+    alert("Before dmcaing please contact me at celestialinqmail@gmail.com ty <3");
+  </script>
+  <base href="https://cdn.jsdelivr.net/gh/aukak/fyinx@latest/g/balatro/">
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, minimum-scale=1, maximum-scale=1">
+  <title>Balatro</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/aukak/fyinx@main/g/balatro/theme/love.css">
+  <script src="https://cdn.jsdelivr.net/gh/aukak/fyinx@main/g/balatro/consolewrapper.js"></script>
 
-  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/aukak/fyinx@main/g/balatro/theme/love.css">
-  <script src="https://cdn.jsdelivr.net/gh/aukak/fyinx@main/g/balatro/consolewrapper.js"></script>
+  <style>
+    * { box-sizing: border-box; }
 
-  <style>
-    #save-manager {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      z-index: 9999;
-      display: flex;
-      gap: 6px;
-      flex-direction: column;
-      align-items: flex-end;
-    }
-    #save-manager .btn-row {
-      display: flex;
-      gap: 6px;
-    }
-    #save-manager button {
-      padding: 6px 12px;
-      font-size: 13px;
-      font-family: arial, sans-serif;
-      cursor: pointer;
-      border-radius: 6px;
-      border: 1px solid #555;
-      background: rgba(20, 20, 30, 0.85);
-      color: #eee;
-      backdrop-filter: blur(4px);
-    }
-    #save-manager button:hover {
-      background: rgba(60, 60, 80, 0.95);
-    }
-    #save-status {
-      font-size: 12px;
-      font-family: arial, sans-serif;
-      color: #aef;
-      background: rgba(10,10,20,0.75);
-      padding: 3px 8px;
-      border-radius: 4px;
-      display: none;
-    }
-  </style>
+    /* ── Modal overlay ── */
+    #save-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: rgba(0, 0, 0, 0.72);
+      align-items: center;
+      justify-content: center;
+    }
+    #save-modal-overlay.open { display: flex; }
+
+    #save-modal {
+      background: #1a1a2e;
+      border: 1px solid #3a3a5c;
+      border-radius: 12px;
+      padding: 28px 32px;
+      width: 380px;
+      max-width: 95vw;
+      font-family: arial, sans-serif;
+      color: #e8e8f0;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    }
+
+    #save-modal h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.02em;
+    }
+    #save-modal .subtitle {
+      font-size: 12px;
+      color: #7777aa;
+      margin: 0 0 22px;
+    }
+
+    .modal-section {
+      border-top: 1px solid #2e2e50;
+      padding-top: 16px;
+      margin-top: 16px;
+    }
+    .modal-section-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #7777aa;
+      margin-bottom: 10px;
+    }
+
+    .modal-btn {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: arial, sans-serif;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 1px solid #3a3a5c;
+      background: #22223a;
+      color: #dde;
+      text-align: left;
+      margin-bottom: 8px;
+      transition: background 0.15s;
+    }
+    .modal-btn:last-child { margin-bottom: 0; }
+    .modal-btn:hover { background: #2e2e52; }
+    .modal-btn .btn-icon { font-size: 16px; flex-shrink: 0; }
+    .modal-btn .btn-label { flex: 1; }
+    .modal-btn .btn-hint { font-size: 11px; color: #7777aa; }
+
+    /* Auto-save toggle row */
+    .autosave-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #3a3a5c;
+      background: #22223a;
+      margin-bottom: 8px;
+    }
+    .autosave-row .as-info { display: flex; flex-direction: column; gap: 2px; }
+    .autosave-row .as-title { font-size: 14px; color: #dde; }
+    .autosave-row .as-sub { font-size: 11px; color: #7777aa; }
+
+    .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #3a3a5c;
+      border-radius: 22px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-slider:before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      top: 3px;
+      background: #aaa;
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: #5b4fcf; }
+    .toggle input:checked + .toggle-slider:before { transform: translateX(18px); background: #fff; }
+
+    /* Status bar */
+    #save-status {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #aef;
+      background: rgba(80,80,160,0.18);
+      border: 1px solid #3a3a5c;
+      border-radius: 6px;
+      padding: 7px 12px;
+      display: none;
+      line-height: 1.4;
+    }
+    #save-status.ok  { color: #7fc97f; }
+    #save-status.err { color: #f77; }
+
+    /* Close hint */
+    .modal-close-hint {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 11px;
+      color: #555577;
+    }
+    kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      border: 1px solid #444466;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #8888bb;
+    }
+
+    /* Auto-save file indicator */
+    .as-file-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid #3a3a5c;
+      background: #1c1c30;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #7777aa;
+    }
+    .as-file-row .as-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #444466;
+      flex-shrink: 0;
+    }
+    .as-file-row.active .as-dot { background: #5b4fcf; }
+    .as-file-row.active { color: #aaa8dd; }
+
+    /* Canvas stuff */
+    #loadingCanvas, #canvas { display: block; }
+  </style>
 </head>
 
 <body>
-  <div id="save-manager">
-    <div class="btn-row">
-      <button onclick="exportSave()">&#8681; Export Save</button>
-      <button onclick="document.getElementById('import-input').click()">&#8679; Import Save</button>
-      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importSave(event)">
-    </div>
-    <div id="save-status"></div>
-  </div>
 
-  <center>
-    <div>
-      <canvas id="loadingCanvas" oncontextmenu="event.preventDefault()" width="800" height="600"></canvas>
-      <canvas id="canvas" oncontextmenu="event.preventDefault()" width="100%" height="100%"></canvas>
-    </div>
-  </center>
+  <!-- ── Save Modal ── -->
+  <div id="save-modal-overlay" role="dialog" aria-modal="true" aria-label="Save Manager">
+    <div id="save-modal">
+      <h2>&#128190; Save Manager</h2>
+      <p class="subtitle">Press <kbd>[</kbd> to toggle &nbsp;·&nbsp; All save data lives in your browser's IndexedDB</p>
 
-  <script type='text/javascript'>
-    // ---- Save manager ----
-    const DB_NAME = "/home/web_user/love";
-    const STORE_NAME = "FILE_DATA";
+      <!-- Manual export/import -->
+      <div class="modal-section-label">Manual save file</div>
 
-    function showStatus(msg, color) {
-      const el = document.getElementById('save-status');
-      el.textContent = msg;
-      el.style.display = 'block';
-      el.style.color = color || '#aef';
-      clearTimeout(el._t);
-      el._t = setTimeout(() => el.style.display = 'none', 4000);
-    }
+      <button class="modal-btn" onclick="exportSave()">
+        <span class="btn-icon">&#8681;</span>
+        <span class="btn-label">Export save</span>
+        <span class="btn-hint">Downloads a .json file</span>
+      </button>
 
-    function openDB() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME);
-        req.onsuccess = e => resolve(e.target.result);
-        req.onerror = e => reject(e.target.error);
-      });
-    }
+      <button class="modal-btn" onclick="document.getElementById('import-input').click()">
+        <span class="btn-icon">&#8679;</span>
+        <span class="btn-label">Import save</span>
+        <span class="btn-hint">Replaces current save</span>
+      </button>
+      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importSave(event)">
 
-    function getAllEntries(db) {
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const results = [];
-        store.openCursor().onsuccess = e => {
-          const cursor = e.target.result;
-          if (cursor) { results.push({ key: cursor.key, value: cursor.value }); cursor.continue(); }
-          else resolve(results);
-        };
-        tx.onerror = e => reject(e.target.error);
-      });
-    }
+      <!-- Auto-save section -->
+      <div class="modal-section">
+        <div class="modal-section-label">Auto-save to disk (File System Access API)</div>
 
-    async function exportSave() {
-      try {
-        showStatus('Exporting...');
-        const db = await openDB();
-        const entries = await getAllEntries(db);
-        db.close();
-        const serialized = entries.map(({ key, value }) => {
-          const v = { ...value };
-          if (v.contents instanceof Int8Array) { v.contents = Array.from(v.contents); v._type = 'Int8Array'; }
-          if (v.timestamp instanceof Date) { v.timestamp = v.timestamp.toISOString(); v._tsType = 'Date'; }
-          return { key, value: v };
-        });
-        const blob = new Blob([JSON.stringify(serialized, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'balatro-save-' + new Date().toISOString().slice(0, 10) + '.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        showStatus('Exported ' + entries.length + ' entries!', '#7f7');
-      } catch (err) {
-        showStatus('Export failed: ' + err.message, '#f77');
-      }
-    }
+        <div class="autosave-row">
+          <div class="as-info">
+            <span class="as-title">Auto-save</span>
+            <span class="as-sub" id="as-interval-label">Saves to a file on your computer every 30s</span>
+          </div>
+          <div class="toggle-wrap">
+            <label class="toggle">
+              <input type="checkbox" id="autosave-toggle" onchange="toggleAutoSave()">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
 
-    async function importSave(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      try {
-        showStatus('Importing...');
-        const text = await file.text();
-        const entries = JSON.parse(text);
-        const db = await openDB();
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        for (const { key, value } of entries) {
-          const v = { ...value };
-          if (v._type === 'Int8Array' && Array.isArray(v.contents)) { v.contents = new Int8Array(v.contents); delete v._type; }
-          if (v._tsType === 'Date' && typeof v.timestamp === 'string') { v.timestamp = new Date(v.timestamp); delete v._tsType; }
-          store.put(v, key);
-        }
-        await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = e => rej(e.target.error); });
-        db.close();
-        showStatus('Imported! Reload to apply.', '#7f7');
-      } catch (err) {
-        showStatus('Import failed: ' + err.message, '#f77');
-      }
-      event.target.value = '';
-    }
-    // ---- End save manager ----
+        <div class="as-file-row" id="as-file-indicator">
+          <span class="as-dot"></span>
+          <span id="as-file-label">No file selected — enable auto-save to pick one</span>
+        </div>
 
-    window.callad = () => {
-      window.parent.postMessage({ type: 'adcall' }, '*');
-    }
+        <button class="modal-btn" id="as-save-now-btn" onclick="autoSaveNow()" style="display:none">
+          <span class="btn-icon">&#9654;</span>
+          <span class="btn-label">Save now</span>
+          <span class="btn-hint">Write to file immediately</span>
+        </button>
+      </div>
 
-    var canvas = document.getElementById("loadingCanvas");
-    canvas.width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-    canvas.height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+      <div id="save-status"></div>
 
-    function goFullScreen() {
-      var canvas = document.getElementById("canvas");
-      if (canvas.requestFullScreen) canvas.requestFullScreen();
-      else if (canvas.webkitRequestFullScreen) canvas.webkitRequestFullScreen();
-      else if (canvas.mozRequestFullScreen) canvas.mozRequestFullScreen();
-    }
+      <p class="modal-close-hint">Press <kbd>[</kbd> or click outside to close</p>
+    </div>
+  </div>
 
-    function FullScreenHook() {
-      var canvas = document.getElementById("canvas");
-      canvas.width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-      canvas.height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
-    }
+  <!-- ── Game canvases ── -->
+  <center>
+    <div>
+      <canvas id="loadingCanvas" oncontextmenu="event.preventDefault()" width="800" height="600"></canvas>
+      <canvas id="canvas" oncontextmenu="event.preventDefault()" width="100%" height="100%"></canvas>
+    </div>
+  </center>
 
-    var loadingContext = document.getElementById('loadingCanvas').getContext('2d');
+  <script>
+    // ────────────────────────────────────────────────
+    // Config
+    // ────────────────────────────────────────────────
+    const DB_NAME    = "/home/web_user/love";
+    const STORE_NAME = "FILE_DATA";
+    const AUTOSAVE_INTERVAL_MS = 30000;
 
-    function drawLoadingText(text) {
-      var canvas = loadingContext.canvas;
-      loadingContext.fillStyle = "rgb(142, 195, 227)";
-      loadingContext.fillRect(0, 0, canvas.scrollWidth, canvas.scrollHeight);
-      loadingContext.font = '2em arial';
-      loadingContext.textAlign = 'center';
-      loadingContext.fillStyle = "rgb( 11, 86, 117 )";
-      loadingContext.fillText(text, canvas.scrollWidth / 2, canvas.scrollHeight / 2);
-    }
+    // ────────────────────────────────────────────────
+    // Modal open/close
+    // ────────────────────────────────────────────────
+    const overlay = document.getElementById('save-modal-overlay');
 
-    window.onload = function() { window.focus(); };
-    window.onclick = function() { window.focus(); };
+    function openModal() { overlay.classList.add('open'); }
+    function closeModal() { overlay.classList.remove('open'); }
 
-    window.addEventListener("keydown", function(e) {
-      if ([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) { e.preventDefault(); }
-    }, false);
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) closeModal();
+    });
 
-    var Module = {
-      arguments: ["./game.love"],
-      INITIAL_MEMORY: 256000000,
-      printErr: console.error.bind(console),
-      canvas: (function() {
-        var canvas = document.getElementById('canvas');
-        canvas.addEventListener("webglcontextlost", function(e) {
-          alert('WebGL context lost. You will need to reload the page.');
-          e.preventDefault();
-        }, false);
-        return canvas;
-      })(),
-      setStatus: function(text) {
-        if (text) {
-          drawLoadingText(text);
-        } else if (Module.remainingDependencies === 0) {
-          document.getElementById('loadingCanvas').style.display = 'none';
-          document.getElementById('canvas').style.visibility = 'visible';
-        }
-      },
-      totalDependencies: 0,
-      remainingDependencies: 0,
-      monitorRunDependencies: function(left) {
-        this.remainingDependencies = left;
-        this.totalDependencies = Math.max(this.totalDependencies, left);
-        Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
-      }
-    };
+    document.addEventListener('keydown', e => {
+      if (e.key === '[') {
+        e.preventDefault();
+        overlay.classList.contains('open') ? closeModal() : openModal();
+      }
+      if (e.key === 'Escape') closeModal();
+    });
 
-    Module.setStatus('Downloading...');
-    window.onerror = function(event) {
-      Module.setStatus('Exception thrown, see JavaScript console');
-      Module.setStatus = function(text) {
-        if (text) Module.printErr('[post-exception status] ' + text);
-      };
-    };
+    // ────────────────────────────────────────────────
+    // Status helper
+    // ────────────────────────────────────────────────
+    function showStatus(msg, type) {
+      const el = document.getElementById('save-status');
+      el.textContent = msg;
+      el.className = type || '';
+      el.style.display = 'block';
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
 
-    var applicationLoad = function(e) { Love(Module); }
-  </script>
+    // ────────────────────────────────────────────────
+    // IndexedDB helpers
+    // ────────────────────────────────────────────────
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME);
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror  = e => reject(e.target.error);
+      });
+    }
 
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/aukak/fyinx@main/g/balatro/game.js?v=d7e34743-2fea-4de6-8a0e-1103b5fcf07f"></script>
-  <script async type="text/javascript" src="https://cdn.jsdelivr.net/gh/aukak/fyinx@main/g/balatro/love.js" onload="applicationLoad(this)"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"045251d0cf4248a08ff420c687ac8968","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+    function getAllEntries(db) {
+      return new Promise((resolve, reject) => {
+        const tx    = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const results = [];
+        store.openCursor().onsuccess = e => {
+          const cursor = e.target.result;
+          if (cursor) { results.push({ key: cursor.key, value: cursor.value }); cursor.continue(); }
+          else resolve(results);
+        };
+        tx.onerror = e => reject(e.target.error);
+      });
+    }
+
+    /** Clear every record from the store, then write entries. */
+    function replaceAllEntries(db, entries) {
+      return new Promise((resolve, reject) => {
+        const tx    = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+
+        // Step 1: clear
+        const clearReq = store.clear();
+        clearReq.onsuccess = () => {
+          // Step 2: write new entries
+          for (const { key, value } of entries) {
+            store.put(value, key);
+          }
+        };
+        clearReq.onerror = e => reject(e.target.error);
+
+        tx.oncomplete = resolve;
+        tx.onerror    = e => reject(e.target.error);
+      });
+    }
+
+    /** Serialize entries to a JSON-safe array */
+    function serializeEntries(entries) {
+      return entries.map(({ key, value }) => {
+        const v = { ...value };
+        if (v.contents instanceof Int8Array) { v.contents = Array.from(v.contents); v._type = 'Int8Array'; }
+        if (v.timestamp instanceof Date)     { v.timestamp = v.timestamp.toISOString(); v._tsType = 'Date'; }
+        return { key, value: v };
+      });
+    }
+
+    /** Deserialize entries from JSON-safe array back to native types */
+    function deserializeEntries(raw) {
+      return raw.map(({ key, value }) => {
+        const v = { ...value };
+        if (v._type === 'Int8Array' && Array.isArray(v.contents)) { v.contents = new Int8Array(v.contents); delete v._type; }
+        if (v._tsType === 'Date' && typeof v.timestamp === 'string') { v.timestamp = new Date(v.timestamp); delete v._tsType; }
+        return { key, value: v };
+      });
+    }
+
+    // ────────────────────────────────────────────────
+    // Manual export
+    // ────────────────────────────────────────────────
+    async function exportSave() {
+      try {
+        showStatus('Exporting…');
+        const db      = await openDB();
+        const entries = await getAllEntries(db);
+        db.close();
+
+        const blob = new Blob([JSON.stringify(serializeEntries(entries), null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'balatro-save-' + new Date().toISOString().slice(0, 10) + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        showStatus('Exported ' + entries.length + ' entries!', 'ok');
+      } catch (err) {
+        showStatus('Export failed: ' + err.message, 'err');
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    // Manual import  (clears everything first)
+    // ────────────────────────────────────────────────
+    async function importSave(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        showStatus('Importing… (clearing old save first)');
+        const text    = await file.text();
+        const raw     = JSON.parse(text);
+        const entries = deserializeEntries(raw);
+
+        const db = await openDB();
+        await replaceAllEntries(db, entries);   // ← clear + write atomically
+        db.close();
+
+        showStatus('Imported ' + entries.length + ' entries! Reload to apply.', 'ok');
+      } catch (err) {
+        showStatus('Import failed: ' + err.message, 'err');
+      }
+      event.target.value = '';
+    }
+
+    // ────────────────────────────────────────────────
+    // File System Access API — auto-save
+    // ────────────────────────────────────────────────
+    let autoSaveHandle   = null;   // FileSystemFileHandle
+    let autoSaveTimer    = null;
+    let autoSaveEnabled  = false;
+
+    function updateAutoSaveUI() {
+      const toggle    = document.getElementById('autosave-toggle');
+      const indicator = document.getElementById('as-file-indicator');
+      const fileLabel = document.getElementById('as-file-label');
+      const saveNow   = document.getElementById('as-save-now-btn');
+
+      toggle.checked = autoSaveEnabled;
+
+      if (autoSaveEnabled && autoSaveHandle) {
+        indicator.classList.add('active');
+        fileLabel.textContent = 'Writing to: ' + autoSaveHandle.name;
+        saveNow.style.display = 'flex';
+        document.getElementById('as-interval-label').textContent = 'Saves every 30s to your chosen file';
+      } else {
+        indicator.classList.remove('active');
+        fileLabel.textContent = autoSaveHandle
+          ? 'File selected but auto-save is off: ' + autoSaveHandle.name
+          : 'No file selected — enable auto-save to pick one';
+        saveNow.style.display = autoSaveHandle ? 'flex' : 'none';
+        document.getElementById('as-interval-label').textContent = 'Saves to a file on your computer every 30s';
+      }
+    }
+
+    async function pickFileForAutoSave() {
+      if (!('showSaveFilePicker' in window)) {
+        showStatus('File System Access API not supported in this browser.', 'err');
+        return false;
+      }
+      try {
+        autoSaveHandle = await window.showSaveFilePicker({
+          suggestedName: 'balatro-autosave.json',
+          types: [{ description: 'JSON Save File', accept: { 'application/json': ['.json'] } }]
+        });
+        return true;
+      } catch (err) {
+        if (err.name !== 'AbortError') showStatus('File picker error: ' + err.message, 'err');
+        return false;
+      }
+    }
+
+    async function writeToFile(handle, data) {
+      const writable = await handle.createWritable();
+      await writable.write(data);
+      await writable.close();
+    }
+
+    async function performAutoSave() {
+      if (!autoSaveHandle) return;
+      try {
+        const db      = await openDB();
+        const entries = await getAllEntries(db);
+        db.close();
+        const json = JSON.stringify(serializeEntries(entries), null, 2);
+        await writeToFile(autoSaveHandle, json);
+        // Quiet success — don't spam modal with status on interval saves
+      } catch (err) {
+        showStatus('Auto-save failed: ' + err.message, 'err');
+      }
+    }
+
+    async function toggleAutoSave() {
+      const toggle = document.getElementById('autosave-toggle');
+
+      if (toggle.checked) {
+        // Turning on
+        if (!autoSaveHandle) {
+          const picked = await pickFileForAutoSave();
+          if (!picked) {
+            toggle.checked = false;
+            autoSaveEnabled = false;
+            updateAutoSaveUI();
+            return;
+          }
+        }
+        autoSaveEnabled = true;
+        clearInterval(autoSaveTimer);
+        autoSaveTimer = setInterval(performAutoSave, AUTOSAVE_INTERVAL_MS);
+        await performAutoSave();
+        showStatus('Auto-save enabled! Writing to: ' + autoSaveHandle.name, 'ok');
+      } else {
+        // Turning off
+        autoSaveEnabled = false;
+        clearInterval(autoSaveTimer);
+        autoSaveTimer = null;
+        showStatus('Auto-save disabled.', '');
+      }
+
+      updateAutoSaveUI();
+    }
+
+    async function autoSaveNow() {
+      if (!autoSaveHandle) {
+        showStatus('No file selected yet.', 'err');
+        return;
+      }
+      showStatus('Saving…');
+      await performAutoSave();
+      showStatus('Saved to ' + autoSaveHandle.name + '!', 'ok');
+    }
+
+    // ────────────────────────────────────────────────
+    // Game bootstrap
+    // ────────────────────────────────────────────────
+    window.callad = () => {
+      window.parent.postMessage({ type: 'adcall' }, '*');
+    };
+
+    var canvas = document.getElementById("loadingCanvas");
+    canvas.width  = window.innerWidth  || document.documentElement.clientWidth  || document.body.clientWidth;
+    canvas.height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+
+    function goFullScreen() {
+      var c = document.getElementById("canvas");
+      if (c.requestFullScreen)       c.requestFullScreen();
+      else if (c.webkitRequestFullScreen) c.webkitRequestFullScreen();
+      else if (c.mozRequestFullScreen)    c.mozRequestFullScreen();
+    }
+
+    function FullScreenHook() {
+      var c = document.getElementById("canvas");
+      c.width  = window.innerWidth  || document.documentElement.clientWidth  || document.body.clientWidth;
+      c.height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+    }
+
+    var loadingContext = document.getElementById('loadingCanvas').getContext('2d');
+
+    function drawLoadingText(text) {
+      var c = loadingContext.canvas;
+      loadingContext.fillStyle = "rgb(142, 195, 227)";
+      loadingContext.fillRect(0, 0, c.scrollWidth, c.scrollHeight);
+      loadingContext.font = '2em arial';
+      loadingContext.textAlign = 'center';
+      loadingContext.fillStyle = "rgb(11, 86, 117)";
+      loadingContext.fillText(text, c.scrollWidth / 2, c.scrollHeight / 2);
+    }
+
+    window.onload  = function() { window.focus(); };
+    window.onclick = function() { window.focus(); };
+
+    window.addEventListener("keydown", function(e) {
+      if ([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) { e.preventDefault(); }
+    }, false);
+
+    var Module = {
+      arguments: ["./game.love"],
+      INITIAL_MEMORY: 256000000,
+      printErr: console.error.bind(console),
+      canvas: (function() {
+        var c = document.getElementById('canvas');
+        c.addEventListener("webglcontextlost", function(e) {
+          alert('WebGL context lost. You will need to reload the page.');
+          e.preventDefault();
+        }, false);
+        return c;
+      })(),
+      setStatus: function(text) {
+        if (text) {
+          drawLoadingText(text);
+        } else if (Module.remainingDependencies === 0) {
+          document.getElementById('loadingCanvas').style.display = 'none';
+          document.getElementById('canvas').style.visibility = 'visible';
+        }
+      },
+      totalDependencies: 0,
+      remainingDependencies: 0,
+      monitorRunDependencies: function(left) {
+        this.remainingDependencies = left;
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        Module.setStatus(left ? 'Preparing… (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+      }
+    };
+
+    Module.setStatus('Downloading…');
+    window.onerror = function() {
+      Module.setStatus('Exception thrown, see JavaScript console');
+      Module.setStatus = function(text) {
+        if (text) Module.printErr('[post-exception status] ' + text);
+      };
+    };
+
+    var applicationLoad = function() { Love(Module); };
+  </script>
+
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/aukak/fyinx@main/g/balatro/game.js?v=d7e34743-2fea-4de6-8a0e-1103b5fcf07f"></script>
+  <script async type="text/javascript" src="https://cdn.jsdelivr.net/gh/aukak/fyinx@main/g/balatro/love.js" onload="applicationLoad(this)"></script>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"045251d0cf4248a08ff420c687ac8968","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
