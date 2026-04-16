@@ -198,7 +198,7 @@
   <div id="save-modal-overlay" role="dialog" aria-modal="true" aria-label="Save Manager">
     <div id="save-modal">
       <h2>&#128190; Save Manager</h2>
-      <p class="subtitle">Press <kbd>[</kbd> to toggle &nbsp;·&nbsp; All save data lives in your browser's IndexedDB</p>
+      <p class="subtitle">Press <kbd>[</kbd> to toggle &nbsp;·&nbsp; Save data lives in Emscripten virtual FS (synced to IndexedDB)</p>
 
       <!-- Manual export/import -->
       <div class="modal-section-label">Manual save file</div>
@@ -212,7 +212,7 @@
       <button class="modal-btn" onclick="document.getElementById('import-input').click()">
         <span class="btn-icon">&#8679;</span>
         <span class="btn-label">Import save</span>
-        <span class="btn-hint">Replaces current save</span>
+        <span class="btn-hint">Replaces current save (live, no reload needed)</span>
       </button>
       <input type="file" id="import-input" accept=".json" style="display:none" onchange="importSave(event)">
 
@@ -263,8 +263,7 @@
     // ────────────────────────────────────────────────
     // Config
     // ────────────────────────────────────────────────
-    const DB_NAME    = "/home/web_user/love";
-    const STORE_NAME = "FILE_DATA";
+    const SAVE_DIR             = '/home/web_user/love';
     const AUTOSAVE_INTERVAL_MS = 30000;
 
     // ────────────────────────────────────────────────
@@ -272,7 +271,7 @@
     // ────────────────────────────────────────────────
     const overlay = document.getElementById('save-modal-overlay');
 
-    function openModal() { overlay.classList.add('open'); }
+    function openModal()  { overlay.classList.add('open'); }
     function closeModal() { overlay.classList.remove('open'); }
 
     overlay.addEventListener('click', e => {
@@ -293,119 +292,126 @@
     function showStatus(msg, type) {
       const el = document.getElementById('save-status');
       el.textContent = msg;
-      el.className = type || '';
+      el.className   = type || '';
       el.style.display = 'block';
       clearTimeout(el._t);
       el._t = setTimeout(() => { el.style.display = 'none'; }, 5000);
     }
 
     // ────────────────────────────────────────────────
-    // IndexedDB helpers
+    // FS helpers — wrap Emscripten FS in promises
     // ────────────────────────────────────────────────
-    function openDB() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME);
-        req.onsuccess = e => resolve(e.target.result);
-        req.onerror  = e => reject(e.target.error);
-      });
+
+    /** Pull IndexedDB → virtual FS memory */
+    function fsSyncIn() {
+      return new Promise((res, rej) =>
+        FS.syncfs(true, err => err ? rej(err) : res())
+      );
     }
 
-    function getAllEntries(db) {
-      return new Promise((resolve, reject) => {
-        const tx    = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const results = [];
-        store.openCursor().onsuccess = e => {
-          const cursor = e.target.result;
-          if (cursor) { results.push({ key: cursor.key, value: cursor.value }); cursor.continue(); }
-          else resolve(results);
-        };
-        tx.onerror = e => reject(e.target.error);
-      });
+    /** Push virtual FS memory → IndexedDB */
+    function fsSyncOut() {
+      return new Promise((res, rej) =>
+        FS.syncfs(false, err => err ? rej(err) : res())
+      );
     }
 
-    /** Clear every record from the store, then write entries. */
-    function replaceAllEntries(db, entries) {
-      return new Promise((resolve, reject) => {
-        const tx    = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-
-        // Step 1: clear
-        const clearReq = store.clear();
-        clearReq.onsuccess = () => {
-          // Step 2: write new entries
-          for (const { key, value } of entries) {
-            store.put(value, key);
-          }
-        };
-        clearReq.onerror = e => reject(e.target.error);
-
-        tx.oncomplete = resolve;
-        tx.onerror    = e => reject(e.target.error);
-      });
+    /** Recursively read every file under a directory into a flat { path: number[] } map */
+    function fsReadAll(dirPath) {
+      const entries = {};
+      function walk(p) {
+        let items;
+        try { items = FS.readdir(p); } catch(e) { return; }
+        for (const item of items) {
+          if (item === '.' || item === '..') continue;
+          const full = p + '/' + item;
+          try {
+            const stat = FS.stat(full);
+            if (FS.isDir(stat.mode)) {
+              walk(full);
+            } else {
+              entries[full] = Array.from(FS.readFile(full));
+            }
+          } catch(e) { /* skip unreadable */ }
+        }
+      }
+      walk(dirPath);
+      return entries;
     }
 
-    /** Serialize entries to a JSON-safe array */
-    function serializeEntries(entries) {
-      return entries.map(({ key, value }) => {
-        const v = { ...value };
-        if (v.contents instanceof Int8Array) { v.contents = Array.from(v.contents); v._type = 'Int8Array'; }
-        if (v.timestamp instanceof Date)     { v.timestamp = v.timestamp.toISOString(); v._tsType = 'Date'; }
-        return { key, value: v };
-      });
+    /** Write a flat { path: number[] } map back into the virtual FS */
+    function fsWriteAll(entries) {
+      for (const [path, bytes] of Object.entries(entries)) {
+        const dir = path.substring(0, path.lastIndexOf('/'));
+        try { FS.mkdirTree(dir); } catch(e) { /* already exists */ }
+        try {
+          FS.writeFile(path, new Uint8Array(bytes));
+        } catch(e) {
+          console.warn('fsWriteAll: could not write', path, e);
+        }
+      }
     }
 
-    /** Deserialize entries from JSON-safe array back to native types */
-    function deserializeEntries(raw) {
-      return raw.map(({ key, value }) => {
-        const v = { ...value };
-        if (v._type === 'Int8Array' && Array.isArray(v.contents)) { v.contents = new Int8Array(v.contents); delete v._type; }
-        if (v._tsType === 'Date' && typeof v.timestamp === 'string') { v.timestamp = new Date(v.timestamp); delete v._tsType; }
-        return { key, value: v };
-      });
+    /** Return true if the Emscripten FS is ready to use */
+    function fsReady() {
+      return typeof FS !== 'undefined' && typeof FS.syncfs === 'function';
     }
 
     // ────────────────────────────────────────────────
-    // Manual export
+    // Manual export  (FS → JSON file download)
     // ────────────────────────────────────────────────
     async function exportSave() {
+      if (!fsReady()) { showStatus('Game not loaded yet — wait for it to finish loading.', 'err'); return; }
       try {
-        showStatus('Exporting…');
-        const db      = await openDB();
-        const entries = await getAllEntries(db);
-        db.close();
+        showStatus('Syncing from IndexedDB…');
+        await fsSyncIn();                        // make sure memory is up-to-date
 
-        const blob = new Blob([JSON.stringify(serializeEntries(entries), null, 2)], { type: 'application/json' });
+        const entries = fsReadAll(SAVE_DIR);
+        const count   = Object.keys(entries).length;
+        if (count === 0) {
+          showStatus('No save files found in ' + SAVE_DIR, 'err');
+          return;
+        }
+
+        const blob = new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' });
         const url  = URL.createObjectURL(blob);
         const a    = document.createElement('a');
         a.href     = url;
         a.download = 'balatro-save-' + new Date().toISOString().slice(0, 10) + '.json';
         a.click();
         URL.revokeObjectURL(url);
-        showStatus('Exported ' + entries.length + ' entries!', 'ok');
-      } catch (err) {
+        showStatus('Exported ' + count + ' file(s)!', 'ok');
+      } catch(err) {
         showStatus('Export failed: ' + err.message, 'err');
       }
     }
 
     // ────────────────────────────────────────────────
-    // Manual import  (clears everything first)
+    // Manual import  (JSON file → FS → IndexedDB)
     // ────────────────────────────────────────────────
     async function importSave(event) {
       const file = event.target.files[0];
       if (!file) return;
+      if (!fsReady()) { showStatus('Game not loaded yet — wait for it to finish loading.', 'err'); return; }
+
       try {
-        showStatus('Importing… (clearing old save first)');
+        showStatus('Importing…');
         const text    = await file.text();
-        const raw     = JSON.parse(text);
-        const entries = deserializeEntries(raw);
+        const entries = JSON.parse(text);
 
-        const db = await openDB();
-        await replaceAllEntries(db, entries);   // ← clear + write atomically
-        db.close();
+        if (typeof entries !== 'object' || Array.isArray(entries)) {
+          showStatus('Invalid save file format.', 'err');
+          return;
+        }
 
-        showStatus('Imported ' + entries.length + ' entries! Reload to apply.', 'ok');
-      } catch (err) {
+        // Write files into virtual FS
+        fsWriteAll(entries);
+
+        // Persist to IndexedDB immediately
+        await fsSyncOut();
+
+        showStatus('Imported ' + Object.keys(entries).length + ' file(s)! Save is live — no reload needed.', 'ok');
+      } catch(err) {
         showStatus('Import failed: ' + err.message, 'err');
       }
       event.target.value = '';
@@ -414,9 +420,9 @@
     // ────────────────────────────────────────────────
     // File System Access API — auto-save
     // ────────────────────────────────────────────────
-    let autoSaveHandle   = null;   // FileSystemFileHandle
-    let autoSaveTimer    = null;
-    let autoSaveEnabled  = false;
+    let autoSaveHandle  = null;   // FileSystemFileHandle
+    let autoSaveTimer   = null;
+    let autoSaveEnabled = false;
 
     function updateAutoSaveUI() {
       const toggle    = document.getElementById('autosave-toggle');
@@ -452,7 +458,7 @@
           types: [{ description: 'JSON Save File', accept: { 'application/json': ['.json'] } }]
         });
         return true;
-      } catch (err) {
+      } catch(err) {
         if (err.name !== 'AbortError') showStatus('File picker error: ' + err.message, 'err');
         return false;
       }
@@ -465,15 +471,13 @@
     }
 
     async function performAutoSave() {
-      if (!autoSaveHandle) return;
+      if (!autoSaveHandle || !fsReady()) return;
       try {
-        const db      = await openDB();
-        const entries = await getAllEntries(db);
-        db.close();
-        const json = JSON.stringify(serializeEntries(entries), null, 2);
-        await writeToFile(autoSaveHandle, json);
-        // Quiet success — don't spam modal with status on interval saves
-      } catch (err) {
+        await fsSyncIn();                        // pull latest from IDB into memory
+        const entries = fsReadAll(SAVE_DIR);
+        await writeToFile(autoSaveHandle, JSON.stringify(entries, null, 2));
+        // Quiet success — no status spam on interval
+      } catch(err) {
         showStatus('Auto-save failed: ' + err.message, 'err');
       }
     }
@@ -482,11 +486,10 @@
       const toggle = document.getElementById('autosave-toggle');
 
       if (toggle.checked) {
-        // Turning on
         if (!autoSaveHandle) {
           const picked = await pickFileForAutoSave();
           if (!picked) {
-            toggle.checked = false;
+            toggle.checked  = false;
             autoSaveEnabled = false;
             updateAutoSaveUI();
             return;
@@ -498,7 +501,6 @@
         await performAutoSave();
         showStatus('Auto-save enabled! Writing to: ' + autoSaveHandle.name, 'ok');
       } else {
-        // Turning off
         autoSaveEnabled = false;
         clearInterval(autoSaveTimer);
         autoSaveTimer = null;
@@ -509,10 +511,8 @@
     }
 
     async function autoSaveNow() {
-      if (!autoSaveHandle) {
-        showStatus('No file selected yet.', 'err');
-        return;
-      }
+      if (!autoSaveHandle) { showStatus('No file selected yet.', 'err'); return; }
+      if (!fsReady())      { showStatus('Game not loaded yet.', 'err');  return; }
       showStatus('Saving…');
       await performAutoSave();
       showStatus('Saved to ' + autoSaveHandle.name + '!', 'ok');
@@ -525,19 +525,19 @@
       window.parent.postMessage({ type: 'adcall' }, '*');
     };
 
-    var canvas = document.getElementById("loadingCanvas");
+    var canvas    = document.getElementById("loadingCanvas");
     canvas.width  = window.innerWidth  || document.documentElement.clientWidth  || document.body.clientWidth;
     canvas.height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
 
     function goFullScreen() {
       var c = document.getElementById("canvas");
-      if (c.requestFullScreen)       c.requestFullScreen();
+      if      (c.requestFullScreen)       c.requestFullScreen();
       else if (c.webkitRequestFullScreen) c.webkitRequestFullScreen();
       else if (c.mozRequestFullScreen)    c.mozRequestFullScreen();
     }
 
     function FullScreenHook() {
-      var c = document.getElementById("canvas");
+      var c   = document.getElementById("canvas");
       c.width  = window.innerWidth  || document.documentElement.clientWidth  || document.body.clientWidth;
       c.height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
     }
@@ -548,7 +548,7 @@
       var c = loadingContext.canvas;
       loadingContext.fillStyle = "rgb(142, 195, 227)";
       loadingContext.fillRect(0, 0, c.scrollWidth, c.scrollHeight);
-      loadingContext.font = '2em arial';
+      loadingContext.font      = '2em arial';
       loadingContext.textAlign = 'center';
       loadingContext.fillStyle = "rgb(11, 86, 117)";
       loadingContext.fillText(text, c.scrollWidth / 2, c.scrollHeight / 2);
@@ -578,15 +578,18 @@
           drawLoadingText(text);
         } else if (Module.remainingDependencies === 0) {
           document.getElementById('loadingCanvas').style.display = 'none';
-          document.getElementById('canvas').style.visibility = 'visible';
+          document.getElementById('canvas').style.visibility     = 'visible';
         }
       },
-      totalDependencies: 0,
+      totalDependencies:     0,
       remainingDependencies: 0,
       monitorRunDependencies: function(left) {
         this.remainingDependencies = left;
-        this.totalDependencies = Math.max(this.totalDependencies, left);
-        Module.setStatus(left ? 'Preparing… (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+        this.totalDependencies     = Math.max(this.totalDependencies, left);
+        Module.setStatus(left
+          ? 'Preparing… (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
+          : 'All downloads complete.'
+        );
       }
     };
 
